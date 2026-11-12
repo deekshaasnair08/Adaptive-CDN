@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Adaptive CDN Dashboard</title>
+
+<style>
+body {
+    font-family: 'Segoe UI', sans-serif;
+    background: #0f172a;
+    color: white;
+    text-align: center;
+}
+
+h1 {
+    margin: 20px;
+    color: #38bdf8;
+}
+
+button {
+    padding: 10px 20px;
+    margin: 5px;
+    border: none;
+    border-radius: 6px;
+    background: #2563eb;
+    color: white;
+    cursor: pointer;
+}
+
+input {
+    padding: 8px;
+    border-radius: 6px;
+    border: none;
+}
+
+/* STATS */
+.stats {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    margin: 20px;
+}
+
+.stat-box {
+    background: #1e293b;
+    padding: 15px;
+    border-radius: 10px;
+    width: 150px;
+}
+
+/* GRAPH */
+.bar {
+    height: 25px;
+    margin: 10px auto;
+    text-align: left;
+    padding-left: 10px;
+    line-height: 25px;
+    border-radius: 5px;
+}
+
+.s1 { background: #3b82f6; }
+.s2 { background: #22c55e; }
+.s3 { background: #f97316; }
+
+/* CARDS */
+.card {
+    background: #1e293b;
+    margin: 10px auto;
+    padding: 15px;
+    border-radius: 10px;
+    width: 300px;
+    text-align: left;
+    border-left: 5px solid gray;
+}
+
+.fast { border-left-color: #22c55e; }
+.slow { border-left-color: #ef4444; }
+
+</style>
+</head>
+
+<body>
+
+<h1> Adaptive CDN Dashboard</h1>
+
+<button onclick="requestCDN()">Single Request</button>
+<br>
+
+<input type="number" id="requestCount" placeholder="Enter number of requests">
+<button onclick="multipleRequests()">Send Requests</button>
+
+<!-- STATS -->
+<div class="stats">
+    <div class="stat-box">
+        <h3>Total</h3>
+        <p id="total">0</p>
+    </div>
+    <div class="stat-box">
+        <h3>S1</h3>
+        <p id="s1count">0</p>
+        <small>Avg Score: <span id="s1score">0</span></small>
+    </div>
+    <div class="stat-box">
+        <h3>S2</h3>
+        <p id="s2count">0</p>
+        <small>Avg Score: <span id="s2score">0</span></small>
+    </div>
+    <div class="stat-box">
+        <h3>S3</h3>
+        <p id="s3count">0</p>
+        <small>Avg Score: <span id="s3score">0</span></small>
+    </div>
+</div>
+
+<!-- GRAPH -->
+<div>
+    <div id="bar1" class="bar s1">Server 1</div>
+    <div id="bar2" class="bar s2">Server 2</div>
+    <div id="bar3" class="bar s3">Server 3</div>
+</div>
+
+<div id="result"></div>
+
+<script>
+
+let total = 0;
+
+let usage = {
+    "Server 1": 0,
+    "Server 2": 0,
+    "Server 3": 0
+};
+
+let scores = {
+    "Server 1": [],
+    "Server 2": [],
+    "Server 3": []
+};
+
+
+//  SINGLE
+function requestCDN() {
+    fetchAndDisplay();
+}
+
+
+//  MULTIPLE
+function multipleRequests() {
+    const count = parseInt(document.getElementById("requestCount").value);
+
+    if (!count || count <= 0) {
+        alert("Enter valid number");
+        return;
+    }
+
+    for (let i = 0; i < count; i++) {
+        fetchAndDisplay();
+    }
+}
+
+
+//  CORE
+function fetchAndDisplay() {
+    fetch("http://localhost:5000/request")
+        .then(res => res.json())
+        .then(data => {
+
+            total++;
+            usage[data.server_selected]++;
+            scores[data.server_selected].push(data.prediction_score);
+
+            updateStats();
+            updateGraph();
+
+            displayCard(data);
+
+        });
+}
+
+
+// UPDATE STATS
+function updateStats() {
+    document.getElementById("total").innerText = total;
+
+    ["Server 1","Server 2","Server 3"].forEach((s, i) => {
+        document.getElementById(`s${i+1}count`).innerText = usage[s];
+
+        let avg = scores[s].length
+            ? (scores[s].reduce((a,b)=>a+b)/scores[s].length).toFixed(2)
+            : 0;
+
+        document.getElementById(`s${i+1}score`).innerText = avg;
+    });
+}
+
+
+//  GRAPH
+function updateGraph() {
+    const max = Math.max(...Object.values(usage), 1);
+
+    document.getElementById("bar1").style.width = (usage["Server 1"]/max * 30) + "px";
+    document.getElementById("bar2").style.width = (usage["Server 2"]/max * 30) + "px";
+    document.getElementById("bar3").style.width = (usage["Server 3"]/max * 30) + "px";
+}
+
+
+//  DISPLAY CARD
+function displayCard(data) {
+    const container = document.getElementById("result");
+
+    const fast = data.response_time < 200;
+
+    const card = document.createElement("div");
+    card.className = "card " + (fast ? "fast" : "slow");
+
+    card.innerHTML = `
+        <p><b>${data.server_selected}</b></p>
+        <p>Response: ${data.response_time} ms</p>
+        <p>Score: ${data.prediction_score}</p>
+    `;
+
+    container.prepend(card);
+}
+
+</script>
+
+</body>
+</html>
